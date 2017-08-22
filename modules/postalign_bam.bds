@@ -94,7 +94,7 @@ string samtools_flagstat_bam( string bam, string o_dir, string group ) {
 
 		sys $shcmd_init
 
-		sys sambamba flagstat -t 1 $bam > $qc
+		sys samtools flagstat $bam > $qc
 
 		sys $shcmd_finalize
 	}
@@ -145,14 +145,14 @@ string[] dedup_bam( string bam, string o_dir, string log_o_dir, string group, in
 			//# ==================
 
 			sys if [[ $multimapping > 0 ]]; then \
-				sambamba sort -t $nth_dedup $bam -n -o $qname_sort_bam; \
+				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$bam O=$qname_sort_bam; \
 				samtools view -h $qname_sort_bam | $(which assign_multimappers.py) -k $multimapping | \
 				samtools view -F 1804 -Su /dev/stdin | \
-				sambamba sort -t $nth_dedup /dev/stdin -o $filt_bam; \
+				picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam; \
 				rm -f $qname_sort_bam; \
 			    else \
 			    	samtools view -F 1804 -q $mapq_thresh -u $bam | \
-			    	sambamba sort -t $nth_dedup /dev/stdin -o $filt_bam; \
+				picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam; \
 			    fi
 
 			sys $shcmd_finalize
@@ -193,9 +193,9 @@ string[] dedup_bam( string bam, string o_dir, string log_o_dir, string group, in
 				sys samtools view -F 1804 -b $dupmark_bam > $nodup_bam
 
 				//# Index Final BAM file
-				sys sambamba index -t $nth_dedup $nodup_bam
+				sys samtools index $nodup_bam
 
-				sys sambamba flagstat -t $nth_dedup $nodup_bam > $map_qc
+				sys samtools flagstat $nodup_bam > $map_qc
 
 				//# =============================
 				//# Compute library complexity
@@ -277,17 +277,17 @@ string[] dedup_bam_PE( string bam, string o_dir, string log_o_dir, string group,
 
 			sys if [[ $multimapping > 0 ]]; then \
 				samtools view -F 524 -f 2 -u $bam | \
-				sambamba sort -t $nth_dedup -n /dev/stdin -o $tmp_filt_bam; \
+				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
 				samtools view -h $tmp_filt_bam | \
 				$(which assign_multimappers.py) -k $multimapping --paired-end | \
 				samtools fixmate -r /dev/stdin $tmp_filt_bam.fixmate.bam; \
 			    else \
 			    	samtools view -F 1804 -f 2 -q $mapq_thresh -u $bam | \
-			    	sambamba sort -t $nth_dedup -n /dev/stdin -o $tmp_filt_bam; \
+				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
 			        samtools fixmate -r $tmp_filt_bam $tmp_filt_bam.fixmate.bam; \
 			    fi
 
-			sys samtools view -F 1804 -f 2 -u $tmp_filt_bam.fixmate.bam | sambamba sort -t $nth_dedup /dev/stdin -o $filt_bam
+			sys samtools view -F 1804 -f 2 -u $tmp_filt_bam.fixmate.bam | picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam
 
 			sys rm -f $tmp_filt_bam.fixmate.bam
 			sys rm -f $tmp_filt_bam
@@ -323,17 +323,17 @@ string[] dedup_bam_PE( string bam, string o_dir, string log_o_dir, string group,
 			tid2 := task( out2<-in2 ) {
 
 				sys $shcmd_init
-
+				sys echo "$shcmd_init"
 				//# ============================
 				//# Remove duplicates
 				//# Index final position sorted BAM
 				//# Create final name sorted BAM
 				//# ============================
-				sys samtools view -F 1804 -f 2 -b $dupmark_bam > $nodup_bam
+				sys echo $(which samtools) && samtools view -F 1804 -f 2 -b $dupmark_bam > $nodup_bam
 
-				sys sambamba index -t $nth_dedup $nodup_bam
+				sys samtools index $nodup_bam
 
-				sys sambamba flagstat -t $nth_dedup $nodup_bam > $map_qc
+				sys samtools flagstat $nodup_bam > $map_qc
 
 				//# =============================
 				//# Compute library complexity
@@ -344,7 +344,7 @@ string[] dedup_bam_PE( string bam, string o_dir, string log_o_dir, string group,
 				//# Obtain unique count statistics
 
 				//# TotalReadPairs [tab] DistinctReadPairs [tab] OneReadPair [tab] TwoReadPairs [tab] NRF=Distinct/Total [tab] PBC1=OnePair/Distinct [tab] PBC2=OnePair/TwoPair
-				sys sambamba sort -t $nth_dedup -n $dupmark_bam -o $dupmark_bam.tmp.bam
+				sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$dupmark_bam O=$dupmark_bam.tmp.bam
 
 				sys bedtools bamtobed -bedpe -i $dupmark_bam.tmp.bam | \
 					awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
@@ -394,10 +394,10 @@ string[] markdup_bam_picard( string bam, string o_dir, string log_o_dir, string 
 
 		//# Set Java environment variable with Xmx, because JVM will ignore our
 		//# runtime flag and use this if it has been set.
-		sys export _JAVA_OPTIONS="-Xms256M -Xmx$max_java_heap -XX:ParallelGCThreads=1"
-		sys if [ -d "${TMPDIR}" ]; then \
-			export _JAVA_OPTIONS="${_JAVA_OPTIONS} -Djava.io.tmpdir=${TMPDIR}"; \
-		fi
+		sys export _JAVA_OPTIONS="${_JAVA_OPTIONS} -Xms256M -Xmx$max_java_heap -XX:ParallelGCThreads=1"
+		// #sys if [ -d "${TMPDIR}" ]; then \
+		// #	export _JAVA_OPTIONS="${_JAVA_OPTIONS} -Djava.io.tmpdir=${TMPDIR}"; \
+		// #fi
 		// to deal with horrible compatility issue for various versions of picard tools
 		// # if PICARDROOT is not defined, then look into ../shared/picard* (default picard dir. in bioconda)
 		// # elseif ../shared/picard*/MarkDuplicates.jar exist, use it
@@ -411,12 +411,12 @@ string[] markdup_bam_picard( string bam, string o_dir, string log_o_dir, string 
 
 		// # if MardDuplicates.jar exists
 		sys if [ -f "${MARKDUP}" ]; then \
-			java -Xmx4G -jar ${MARKDUP} \
+			java -Xmx20G -jar ${MARKDUP} \
 				INPUT="$bam" OUTPUT="$dupmark_bam" \
 				METRICS_FILE="$dup_qc" VALIDATION_STRINGENCY=LENIENT \
 				ASSUME_SORTED=true REMOVE_DUPLICATES=false; \
 		    else \
-			picard MarkDuplicates \
+			echo "$(which picard)" && picard MarkDuplicates \
 				INPUT="$bam" OUTPUT="$dupmark_bam" \
 				METRICS_FILE="$dup_qc" VALIDATION_STRINGENCY=LENIENT \
 				ASSUME_SORTED=true REMOVE_DUPLICATES=false; \
@@ -509,7 +509,7 @@ string nmsrt_bam( string bam, string o_dir, string group ) {
 		sys $shcmd_init
 
 		//sys samtools sort -n $bam $nmsrt_bam_prefix
-		sys sambamba sort -t 1 -n $bam -o $nmsrt_bam
+		sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$bam O=$nmsrt_bam
 
 		sys $shcmd_finalize
 	}
@@ -548,7 +548,7 @@ string srt_bam( string bam, string o_dir, string group ) {
 		//	cp $srt_bam.bai $srt_bam_idx; \
 		//	fi
 
-		sys sambamba sort -t 1 $bam -o $srt_bam
+		sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=$bam O=$srt_bam
 
 		sys $shcmd_finalize
 	}
