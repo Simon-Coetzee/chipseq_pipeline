@@ -145,14 +145,14 @@ string[] dedup_bam( string bam, string o_dir, string log_o_dir, string group, in
 			//# ==================
 
 			sys if [[ $multimapping > 0 ]]; then \
-				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$bam O=$qname_sort_bam; \
+				picard SortSam TMP_DIR=/scratch/bermanblab SO=queryname I=$bam O=$qname_sort_bam; \
 				samtools view -h $qname_sort_bam | $(which assign_multimappers.py) -k $multimapping | \
 				samtools view -F 1804 -Su /dev/stdin | \
-				picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam; \
+				picard SortSam TMP_DIR=/scratch/bermanblab SO=coordinate I=/dev/stdin O=$filt_bam; \
 				rm -f $qname_sort_bam; \
 			    else \
 			    	samtools view -F 1804 -q $mapq_thresh -u $bam | \
-				picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam; \
+				picard SortSam TMP_DIR=/scratch/bermanblab SO=coordinate I=/dev/stdin O=$filt_bam; \
 			    fi
 
 			sys $shcmd_finalize
@@ -277,17 +277,17 @@ string[] dedup_bam_PE( string bam, string o_dir, string log_o_dir, string group,
 
 			sys if [[ $multimapping > 0 ]]; then \
 				samtools view -F 524 -f 2 -u $bam | \
-				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
+				picard SortSam TMP_DIR=/scratch/bermanblab SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
 				samtools view -h $tmp_filt_bam | \
 				$(which assign_multimappers.py) -k $multimapping --paired-end | \
 				samtools fixmate -r /dev/stdin $tmp_filt_bam.fixmate.bam; \
 			    else \
 			    	samtools view -F 1804 -f 2 -q $mapq_thresh -u $bam | \
-				picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
+				picard SortSam TMP_DIR=/scratch/bermanblab SO=queryname I=/dev/stdin O=$tmp_filt_bam; \
 			        samtools fixmate -r $tmp_filt_bam $tmp_filt_bam.fixmate.bam; \
 			    fi
 
-			sys samtools view -F 1804 -f 2 -u $tmp_filt_bam.fixmate.bam | picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=/dev/stdin O=$filt_bam
+			sys samtools view -F 1804 -f 2 -u $tmp_filt_bam.fixmate.bam | picard SortSam TMP_DIR=/scratch/bermanblab SO=coordinate I=/dev/stdin O=$filt_bam
 
 			sys rm -f $tmp_filt_bam.fixmate.bam
 			sys rm -f $tmp_filt_bam
@@ -344,7 +344,7 @@ string[] dedup_bam_PE( string bam, string o_dir, string log_o_dir, string group,
 				//# Obtain unique count statistics
 
 				//# TotalReadPairs [tab] DistinctReadPairs [tab] OneReadPair [tab] TwoReadPairs [tab] NRF=Distinct/Total [tab] PBC1=OnePair/Distinct [tab] PBC2=OnePair/TwoPair
-				sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$dupmark_bam O=$dupmark_bam.tmp.bam
+				sys picard SortSam TMP_DIR=/scratch/bermanblab SO=queryname I=$dupmark_bam O=$dupmark_bam.tmp.bam
 
 				sys bedtools bamtobed -bedpe -i $dupmark_bam.tmp.bam | \
 					awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
@@ -509,7 +509,7 @@ string nmsrt_bam( string bam, string o_dir, string group ) {
 		sys $shcmd_init
 
 		//sys samtools sort -n $bam $nmsrt_bam_prefix
-		sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=queryname I=$bam O=$nmsrt_bam
+		sys picard SortSam TMP_DIR=/scratch/bermanblab SO=queryname I=$bam O=$nmsrt_bam
 
 		sys $shcmd_finalize
 	}
@@ -548,7 +548,7 @@ string srt_bam( string bam, string o_dir, string group ) {
 		//	cp $srt_bam.bai $srt_bam_idx; \
 		//	fi
 
-		sys picard SortSam TMP_DIR=/scratch/coetzeesg SO=coordinate I=$bam O=$srt_bam
+		sys picard SortSam TMP_DIR=/scratch/bermanblab SO=coordinate I=$bam O=$srt_bam
 
 		sys $shcmd_finalize
 	}
